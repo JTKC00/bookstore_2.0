@@ -29,6 +29,13 @@ def inquiries(request):
             contact_message = form.save(commit=False)
             if request.user.is_authenticated:
                 contact_message.user = request.user
+                # 如果用戶已登入，確保姓名和電郵欄位有值
+                if not contact_message.last_name:
+                    contact_message.last_name = getattr(request.user, 'last_name', '') or ''
+                if not contact_message.first_name:
+                    contact_message.first_name = getattr(request.user, 'first_name', '') or request.user.username
+                if not contact_message.email:
+                    contact_message.email = request.user.email
                 
             contact_message.save()
             messages.success(request, "您的查詢已成功送出，我們會盡快回覆您！")
