@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if profile_user == user %}我的評論{% else %}{{ profile_user.username }} 的評論{% endif %} - 開心書店{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>
+                        {% if profile_user == user %}
+                            我的評論
+                        {% else %}
+                            {{ profile_user.username }} 的評論
+                        {% endif %}
+                        <span class="badge badge-secondary">{{ reviews|length }} 則</span>
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% for review in reviews %}
+                        <div class="row mb-4 pb-3 border-bottom">
+                            <div class="col-md-2">
+                                {% if review.book.photo_small %}
+                                    <img src="{{ review.book.photo_small.url }}" class="img-fluid rounded" alt="{{ review.book.title }}">
+                                {% else %}
+                                    <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 100px;">
+                                        <span class="text-muted small">無圖片</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-10">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6>
+                                            <a href="{% url 'books:book' review.book.id %}" class="text-decoration-none">
+                                                {{ review.book.title }}
+                                            </a>
+                                        </h6>
+                                        <p class="text-muted small">{{ review.book.author }} | {{ review.book.publisher }}</p>
+                                        
+                                        <div class="mb-2">
+                                            <span class="text-warning">{{ review.rating_stars }}</span>
+                                            <span class="ml-2">{{ review.rating }}/5</span>
+                                            {% if review.is_verified_purchase %}
+                                                <span class="badge badge-success ml-2">已驗證購買</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if review.title %}
+                                            <h6>{{ review.title }}</h6>
+                                        {% endif %}
+                                        
+                                        <p>{{ review.content|linebreaks }}</p>
+                                        
+                                        <p class="text-muted small">
+                                            發布於 {{ review.created_at|date:"Y-m-d H:i" }}
+                                            {% if review.updated_at != review.created_at %}
+                                                | 更新於 {{ review.updated_at|date:"Y-m-d H:i" }}
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                    
+                                    {% if profile_user == user %}
+                                        <div class="ml-3">
+                                            <a href="{% url 'reviews:edit_review' review.id %}" class="btn btn-sm btn-outline-primary">編輯</a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="text-center py-5">
+                            <h5 class="text-muted">
+                                {% if profile_user == user %}
+                                    您還沒有評論過任何書籍
+                                {% else %}
+                                    {{ profile_user.username }} 還沒有評論過任何書籍
+                                {% endif %}
+                            </h5>
+                            {% if profile_user == user %}
+                                <p class="text-muted">去書籍頁面寫下您的第一則評論吧！</p>
+                                <a href="{% url 'books:book_list' %}" class="btn btn-primary">瀏覽書籍</a>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <!-- 分頁 -->
+                    {% if reviews.has_other_pages %}
+                        <nav aria-label="評論分頁">
+                            <ul class="pagination justify-content-center">
+                                {% if reviews.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ reviews.previous_page_number }}">上一頁</a>
+                                    </li>
+                                {% endif %}
+                                
+                                {% for page_num in reviews.paginator.page_range %}
+                                    {% if page_num == reviews.number %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if reviews.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ reviews.next_page_number }}">下一頁</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

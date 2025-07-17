@@ -17,6 +17,29 @@ class Book(models.Model):
     is_hots = models.BooleanField(default=False)
     is_new = models.BooleanField(default=False)
     is_recommended = models.BooleanField(default=False)
+    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00, verbose_name="平均評分")
+    review_count = models.IntegerField(default=0, verbose_name="評論數量")
 
     def __str__(self):
         return self.title
+    
+    def update_average_rating(self):
+        """更新平均評分和評論數量"""
+        from django.db.models import Avg, Count
+        ratings = self.reviews.aggregate(
+            avg_rating=Avg('rating'),
+            count=Count('id')
+        )
+        self.average_rating = ratings['avg_rating'] or 0.00
+        self.review_count = ratings['count'] or 0
+        self.save(update_fields=['average_rating', 'review_count'])
+    
+    @property
+    def rating_stars(self):
+        """返回星星顯示"""
+        if self.average_rating > 0:
+            full_stars = int(self.average_rating)
+            half_star = 1 if self.average_rating - full_stars >= 0.5 else 0
+            empty_stars = 5 - full_stars - half_star
+            return '⭐' * full_stars + ('⭐' if half_star else '') + '☆' * empty_stars
+        return '☆☆☆☆☆'

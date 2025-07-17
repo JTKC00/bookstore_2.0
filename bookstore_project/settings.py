@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'pages.apps.PagesConfig',
     'payments.apps.PaymentsConfig',
     'inquiries.apps.InquiriesConfig',
+    'reviews.apps.ReviewsConfig',
     'import_export',
 ]
 

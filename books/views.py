@@ -44,9 +44,21 @@ def categories(request):
 
 def book(request, book_id):
     book = get_object_or_404(Book, pk=book_id)
-    return render(request, 'books/book.html', {
-        'book': book
-    })
+    
+    # 獲取最近的評論（只顯示前3條）
+    recent_reviews = book.reviews.select_related('user').order_by('-created_at')[:3]
+    
+    # 檢查當前用戶是否已經評論過
+    user_review = None
+    if request.user.is_authenticated:
+        user_review = book.reviews.filter(user=request.user).first()
+    
+    context = {
+        'book': book,
+        'recent_reviews': recent_reviews,
+        'user_review': user_review,
+    }
+    return render(request, 'books/book.html', context)
 
 def search(request):
     query = request.GET.get('q', '')           # 取得搜尋關鍵字，q 參數（通常係搜尋字），如果冇，就用預設值 ''(emtpy)

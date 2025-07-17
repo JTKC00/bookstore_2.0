@@ -29,6 +29,7 @@ urlpatterns = [
     path('payments/', include('payments.urls')),
     path('notifications/', include('notifications.urls')),
     path('inquiries/', include('inquiries.urls')),
+    path('reviews/', include('reviews.urls')),
     path('admin/', admin.site.urls),
 ] + debug_toolbar_urls()
 # 多人用要先放  

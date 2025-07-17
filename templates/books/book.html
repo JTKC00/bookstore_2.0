@@ -46,6 +46,16 @@
                     <span class="text-danger fw-bold">售罄</span>
                   {% endif %}
                 </li>
+                <!-- 評分資訊 -->
+                <li><strong>評分：</strong>
+                  {% if book.review_count > 0 %}
+                    <span class="text-warning">{{ book.rating_stars }}</span>
+                    <span class="text-muted">{{ book.average_rating|floatformat:1 }} ({{ book.review_count }} 則評論)</span>
+                    <a href="{% url 'reviews:book_reviews' book.id %}" class="btn btn-sm btn-outline-secondary ms-2">查看所有評論</a>
+                  {% else %}
+                    <span class="text-muted">尚無評論</span>
+                  {% endif %}
+                </li>
               </ul>
               <div class="mb-2">
                 <strong>簡介：</strong>
@@ -74,6 +84,84 @@
             </div>
           </div>
         </div>
+        
+        <!-- 評論區域 -->
+        <div class="card shadow-lg border-0 rounded-4 p-4 mb-4">
+          <h4 class="mb-4">評論與評分</h4>
+          
+          <!-- 評論動作按鈕 -->
+          <div class="mb-4">
+            {% if user.is_authenticated %}
+              {% if user_review %}
+                <a href="{% url 'reviews:edit_review' user_review.id %}" class="btn btn-warning me-2">編輯我的評論</a>
+              {% else %}
+                <a href="{% url 'reviews:add_review' book.id %}" class="btn btn-success me-2">寫評論</a>
+              {% endif %}
+            {% else %}
+              <a href="{% url 'accounts:login' %}" class="btn btn-outline-success me-2">登入後評論</a>
+            {% endif %}
+            
+            {% if book.review_count > 0 %}
+              <a href="{% url 'reviews:book_reviews' book.id %}" class="btn btn-outline-primary">
+                查看所有 {{ book.review_count }} 則評論
+              </a>
+            {% endif %}
+          </div>
+          
+          <!-- 用戶自己的評論 -->
+          {% if user_review %}
+            <div class="alert alert-light border-start border-warning border-3 mb-4">
+              <h6 class="text-warning">您的評論</h6>
+              <div class="mb-2">
+                <span class="text-warning">{{ user_review.rating_stars }}</span>
+                <span class="ms-2">{{ user_review.rating }}/5</span>
+                <span class="text-muted ms-2 small">{{ user_review.created_at|date:"Y-m-d" }}</span>
+              </div>
+              {% if user_review.title %}
+                <h6>{{ user_review.title }}</h6>
+              {% endif %}
+              <p class="mb-0">{{ user_review.content|linebreaks }}</p>
+            </div>
+          {% endif %}
+          
+          <!-- 最近評論 -->
+          {% if recent_reviews %}
+            <h6 class="mb-3">最近評論</h6>
+            {% for review in recent_reviews %}
+              {% if review != user_review %}
+                <div class="border-bottom pb-3 mb-3">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                      <div class="d-flex align-items-center mb-2">
+                        <strong>{{ review.user.username }}</strong>
+                        {% if review.is_verified_purchase %}
+                          <span class="badge bg-success ms-2 small">已驗證購買</span>
+                        {% endif %}
+                        <span class="text-muted ms-auto small">{{ review.created_at|date:"Y-m-d" }}</span>
+                      </div>
+                      <div class="mb-2">
+                        <span class="text-warning">{{ review.rating_stars }}</span>
+                        <span class="ms-2">{{ review.rating }}/5</span>
+                      </div>
+                      {% if review.title %}
+                        <h6>{{ review.title }}</h6>
+                      {% endif %}
+                      <p class="mb-0">{{ review.content|truncatewords:30|linebreaks }}</p>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            {% if not user_review %}
+              <div class="text-center py-4">
+                <h6 class="text-muted">尚無評論</h6>
+                <p class="text-muted">成為第一個評論這本書的人！</p>
+              </div>
+            {% endif %}
+          {% endif %}
+        </div>
+        
         <div class="text-center">
           <a href="{% url 'books:categories' %}" class="btn btn-contact btn-lg">
             <span style="font-size:1.2em;vertical-align:-2px;">⬅️</span> 返回書籍分類

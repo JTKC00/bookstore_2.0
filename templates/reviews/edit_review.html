@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}編輯評論 - 開心書店{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4>編輯評論</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 書籍資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            {% if book.photo_small %}
+                                <img src="{{ book.photo_small.url }}" class="img-fluid rounded" alt="{{ book.title }}">
+                            {% else %}
+                                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 150px;">
+                                    <span class="text-muted">無圖片</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-9">
+                            <h5>{{ book.title }}</h5>
+                            <p class="text-muted">作者：{{ book.author }}</p>
+                            <p class="text-muted">出版社：{{ book.publisher }}</p>
+                            {% if review.is_verified_purchase %}
+                                <span class="badge badge-success">✓ 已驗證購買</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 評論表單 -->
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- 評分 -->
+                        <div class="form-group">
+                            <label>{{ form.rating.label }}</label>
+                            <div class="rating-stars">
+                                {% for choice in form.rating.field.choices %}
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="rating" id="rating{{ choice.0 }}" value="{{ choice.0 }}" 
+                                               {% if form.rating.value == choice.0 or review.rating == choice.0 %}checked{% endif %}>
+                                        <label class="form-check-label" for="rating{{ choice.0 }}">
+                                            {{ choice.1 }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- 標題 -->
+                        <div class="form-group">
+                            <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+                            {{ form.title }}
+                        </div>
+
+                        <!-- 內容 -->
+                        <div class="form-group">
+                            <label for="{{ form.content.id_for_label }}">{{ form.content.label }}</label>
+                            {{ form.content }}
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">更新評論</button>
+                            <a href="{% url 'books:book' book.id %}" class="btn btn-secondary">取消</a>
+                            <a href="{% url 'reviews:delete_review' review.id %}" class="btn btn-danger">刪除評論</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.rating-stars .form-check-label {
+    cursor: pointer;
+    font-size: 1.2em;
+}
+.rating-stars .form-check-input:checked + .form-check-label {
+    color: #ffc107;
+}
+</style>
+{% endblock %}
