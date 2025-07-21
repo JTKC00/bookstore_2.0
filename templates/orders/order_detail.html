@@ -20,9 +20,9 @@
               <p><strong>發票號碼：</strong> {{ order.invoice_no }}</p>
               <p><strong>下單時間：</strong> {{ order.order_date|date:"Y年m月d日 H:i" }}</p>
               <p><strong>訂單狀態：</strong>
-                {% if order.payment_status == "PAID" %}
+                {% if order.payment_status == "已付款" %}
                   <span class="badge badge-success">已付款</span>
-                {% elif order.payment_status == "PENDI" %}
+                {% elif order.payment_status == "待付款" %}
                   <span class="badge badge-warning">待付款</span>
                 {% else %}
                   <span class="badge badge-secondary">{{ order.payment_status }}</span>
@@ -36,12 +36,14 @@
               <p><strong>電話：</strong> {{ order.receipient_phone }}</p>
               <p><strong>地址：</strong> {{ order.shipping_address }}</p>
               <p><strong>運送狀態：</strong>
-                {% if order.shipping_status == "STOCK" %}
+                {% if order.shipping_status == "備貨中" %}
                   <span class="badge badge-info">備貨中</span>
-                {% elif order.shipping_status == "SHIP" %}
+                {% elif order.shipping_status == "已出貨" %}
                   <span class="badge badge-primary">已出貨</span>
-                {% elif order.shipping_status == "DELIV" %}
+                {% elif order.shipping_status == "已送達" %}
                   <span class="badge badge-success">已送達</span>
+                {% elif order.shipping_status == "已取消" %}
+                  <span class="badge badge-danger">已取消</span>
                 {% else %}
                   <span class="badge badge-secondary">{{ order.shipping_status }}</span>
                 {% endif %}

@@ -138,8 +138,8 @@ uvicorn <檔案名稱>:<app物件名稱> --host 0.0.0.0 --port 8001
  ## 特別鳴謝
 
 感謝導師 Mr. Wai Lung Aaron 在原專案學習過程中的悉心指導與支持！
-
 感謝原專案中合作的組員Steve Lam、Edwin Chau、Kelvin Lai！
+
  ---
 
 **注意**: 本系統為學習專案，建議在正式環境使用前進行充分測試和安全性檢查。

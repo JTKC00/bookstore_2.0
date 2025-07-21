@@ -32,9 +32,9 @@
               </div>
               <div class="col-md-2">
                 <h6 class="mb-1">付款狀態</h6>
-                {% if order.payment_status == "PAID" %}
+                {% if order.payment_status == "已付款" %}
                   <span class="badge badge-success">已付款</span>
-                {% elif order.payment_status == "PENDI" %}
+                {% elif order.payment_status == "待付款" %}
                   <span class="badge badge-warning">待付款</span>
                 {% else %}
                   <span class="badge badge-secondary">{{ order.payment_status }}</span>
@@ -42,12 +42,14 @@
               </div>
               <div class="col-md-2">
                 <h6 class="mb-1">運送狀態</h6>
-                {% if order.shipping_status == "STOCK" %}
+                {% if order.shipping_status == "備貨中" %}
                   <span class="badge badge-info">備貨中</span>
-                {% elif order.shipping_status == "SHIP" %}
+                {% elif order.shipping_status == "已出貨" %}
                   <span class="badge badge-primary">已出貨</span>
-                {% elif order.shipping_status == "DELIV" %}
+                {% elif order.shipping_status == "已送達" %}
                   <span class="badge badge-success">已送達</span>
+                {% elif order.shipping_status == "已取消" %}
+                  <span class="badge badge-danger">已取消</span>
                 {% else %}
                   <span class="badge badge-secondary">{{ order.shipping_status }}</span>
                 {% endif %}
@@ -57,7 +59,7 @@
                   <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-outline-primary btn-sm">
                     <i class="fas fa-eye mr-1"></i>查看詳情
                   </a>
-                  {% if order.payment_status == "PENDI" %}
+                  {% if order.payment_status == "待付款" %}
                     <a href="{% url 'payments:payment' order.id %}" class="btn btn-success btn-sm">
                       <i class="fas fa-credit-card mr-1"></i>付款
                     </a>

@@ -192,7 +192,7 @@ def update_quantity(request, item_id):
     pending_orders = Order.objects.filter(
         shopCartId=shopcart,
         userId=request.user,
-        payment_status="PENDI"
+        payment_status="待付款"
     )
     
     for order in pending_orders:

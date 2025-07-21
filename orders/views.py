@@ -289,7 +289,7 @@ def cancel_order_by_id(request, order_id):
         order = get_object_or_404(Order, id=order_id, userId=request.user)
         
         # 檢查訂單狀態是否為待付款
-        if order.payment_status != "PENDI":
+        if order.payment_status != "待付款":
             messages.error(request, "只能取消待付款的訂單。")
             return redirect("orders:order_detail", order_id=order_id)
         

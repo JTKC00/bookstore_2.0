@@ -1,11 +1,7 @@
-# Register your models here.
 from django.contrib import admin
 from orders.models import Order, OrderItem
-from carts.models import ShopCart, CartItem
-
-# Import the Order OrderItem class from models
-from django.forms import NumberInput  # Import NumberInput for form field customization
-from django.db import models  # Import models to use in formfield_overrides'
+from django.forms import NumberInput  
+from django.db import models  
 
 
 ## define a class
