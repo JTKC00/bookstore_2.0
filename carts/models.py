@@ -7,6 +7,14 @@ from books.models import Book
 class ShopCart(models.Model):
     datetime = models.DateTimeField(default=datetime.now, blank=True)
     userId = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True)
+    
+    def clear_cart(self):
+        """清空購物車中所有商品"""
+        self.cartitem_set.all().delete()
+        
+    def clear_ordered_items(self):
+        """清空已下單的商品"""
+        self.cartitem_set.filter(is_ordered=True).delete()
 
 
 class CartItem(models.Model):

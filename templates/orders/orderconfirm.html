@@ -1,11 +1,9 @@
 {% extends 'base.html' %}
-{% block content %}
 {% load humanize %}
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>確認訂單</title>
-</head>
+
+{% block title %}確認訂單 - 開心書店{% endblock %}
+
+{% block content %}
 
 
 <section id="register" class="bg-light py-4">
@@ -40,6 +38,7 @@
                 </div>   
 
                 <form action="{% url 'payments:payment' order.id %}" method="get">
+                    {% csrf_token %}
                     <div class="row">
                         <div class="col-md-6 mb-2">
                             <label for="first_name">姓氏</label>
@@ -136,9 +135,64 @@
     <tr>
       <td colspan="3"></td>
       <td class="text-left align-middle fw-bold">總數量：<span id="total-qty">{{ total_quantity }}</span></td>
-      <td class="text-left align-middle unfold"><span id="total-amount" unfold>總金額：{{total_amount}}</span></td>
-
+      <td class="text-left align-middle unfold"><span id="total-amount" unfold>小計：${{total_amount}}</span></td>
+    </tr>
+    
+    <!-- 優惠碼區域 -->
+    <tr>
+      <td colspan="5">
+        <div class="card mt-3 mb-3">
+          <div class="card-header bg-info text-white">
+            <h6 class="mb-0"><i class="fas fa-tag"></i> 優惠碼</h6>
+          </div>
+          <div class="card-body">
+            {% if coupon %}
+              <!-- 已使用優惠碼 -->
+              <div class="alert alert-success mb-2">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <i class="fas fa-check-circle"></i> 
+                    已使用優惠碼：<strong>{{ coupon.code }}</strong>
+                    {% if coupon.is_percent %}
+                      （{{ coupon.discount }}% 折扣）
+                    {% else %}
+                      （${{ coupon.discount }} 折扣）
+                    {% endif %}
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-danger" id="remove-coupon-btn">
+                    移除
+                  </button>
+                </div>
+              </div>
+            {% else %}
+              <!-- 優惠碼輸入 -->
+              <div class="input-group">
+                <input type="text" class="form-control" id="coupon-code" placeholder="請輸入優惠碼" maxlength="20">
+                <button class="btn btn-primary" type="button" id="apply-coupon-btn">
+                  <i class="fas fa-check"></i> 使用
+                </button>
+              </div>
+              <div id="coupon-message" class="mt-2"></div>
+            {% endif %}
+          </div>
+        </div>
       </td>
+    </tr>
+    
+    <!-- 折扣顯示 -->
+    {% if discount_amount > 0 %}
+    <tr>
+      <td colspan="3"></td>
+      <td class="text-left align-middle text-success">折扣金額：</td>
+      <td class="text-left align-middle text-success">-$<span id="discount-amount">{{ discount_amount }}</span></td>
+    </tr>
+    {% endif %}
+    
+    <!-- 最終金額 -->
+    <tr class="table-warning">
+      <td colspan="3"></td>
+      <td class="text-left align-middle fw-bold text-primary">最終金額：</td>
+      <td class="text-left align-middle fw-bold text-primary fs-5">$<span id="final-amount">{{ final_amount|default:total_amount }}</span></td>
     </tr>
   </tfoot>
 </table>    
@@ -153,7 +207,7 @@
                     <div class="row mb-4">
                         <div class="col-md-4 offset-md-4">
                             <input type="hidden" name="shopcart_id" value="{{ shopcart.id }}">
-                            <input type="hidden" name="total_amount" value="{{ total_amount }}">  
+                            <input type="hidden" name="total_amount" value="{{ final_amount|default:total_amount }}">  
                             <button type="submit" class="btn btn-warning text-white fw-bold w-100 p-3" value="send">
                                 <i class="bi bi-check-circle"></i> 準確下單
                             </button>
@@ -191,4 +245,122 @@
   </div>
 </section>       
 </div>
+
 {% endblock %}
+
+{% block extra_js %}
+<script>
+// 確保 jQuery 已載入
+if (typeof $ === 'undefined') {
+    console.error('jQuery 尚未載入！');
+} else {
+    $(document).ready(function() {
+        console.log('優惠碼 JavaScript 已加載');
+        
+        // 檢查元素是否存在再綁定事件
+        if ($('#apply-coupon-btn').length > 0) {
+        console.log('找到優惠碼應用按鈕，綁定事件');
+        
+        // 應用優惠碼
+        $('#apply-coupon-btn').click(function() {
+            console.log('優惠碼按鈕被點擊');
+            var couponCode = $('#coupon-code').val().trim();
+            console.log('輸入的優惠碼:', couponCode);
+            
+            if (!couponCode) {
+                showMessage('請輸入優惠碼', 'error');
+                return;
+            }
+            
+            console.log('準備發送 AJAX 請求...');
+            $.ajax({
+                url: '{% url "orders:apply_coupon" order.id %}',
+                type: 'POST',
+                data: {
+                    'coupon_code': couponCode,
+                    'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(response) {
+                    console.log('AJAX 請求成功:', response);
+                    if (response.success) {
+                        showMessage(response.message, 'success');
+                        // 重新加載頁面以顯示更新後的優惠碼信息
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        showMessage(response.message, 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX 請求失敗:', xhr, status, error);
+                    console.error('回應內容:', xhr.responseText);
+                    showMessage('應用優惠碼時發生錯誤，請稍後再試', 'error');
+                }
+            });
+        });
+        
+        // 優惠碼輸入框回車事件
+        if ($('#coupon-code').length > 0) {
+            $('#coupon-code').keypress(function(e) {
+                if (e.which === 13) {
+                    $('#apply-coupon-btn').click();
+                }
+            });
+        }
+    } else {
+        console.log('優惠碼應用按鈕不存在（可能已應用優惠碼）');
+    }
+    
+    // 檢查移除優惠碼按鈕是否存在再綁定事件
+    if ($('#remove-coupon-btn').length > 0) {
+        console.log('找到優惠碼移除按鈕，綁定事件');
+        
+        // 移除優惠碼
+        $('#remove-coupon-btn').click(function() {
+            console.log('移除優惠碼按鈕被點擊');
+            if (!confirm('確定要移除優惠碼嗎？')) {
+                return;
+            }
+            
+            $.ajax({
+                url: '{% url "orders:remove_coupon" order.id %}',
+                type: 'POST',
+                data: {
+                    'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showMessage(response.message, 'success');
+                        // 重新加載頁面
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        showMessage(response.message, 'error');
+                    }
+                },
+                error: function() {
+                    showMessage('移除優惠碼時發生錯誤，請稍後再試', 'error');
+                }
+            });
+        });
+    } else {
+        console.log('優惠碼移除按鈕不存在（沒有應用優惠碼）');
+    }
+    
+    // 顯示消息函數
+    function showMessage(message, type) {
+        var alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        var html = '<div class="alert ' + alertClass + ' alert-dismissible fade show" role="alert">' +
+                   message +
+                   '<button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
+                   '<span aria-hidden="true">&times;</span>' +
+                   '</button>' +
+                   '</div>';
+        $('#coupon-message').html(html);
+    }
+    });
+}
+</script>
+{% endblock extra_js %}

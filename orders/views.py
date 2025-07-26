@@ -1,9 +1,11 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import Order, OrderItem
+from .models import Order, OrderItem, Coupon
 from carts.models import ShopCart, CartItem
 from django.contrib import messages
 from datetime import datetime
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 
 
 @login_required
@@ -45,7 +47,7 @@ def orderconfirm(request):
         pending_order = Order.objects.filter(
             shopCartId=shopcart, 
             userId=request.user, 
-            payment_status="PENDI"
+            payment_status="待付款"
         ).first()
         
         if pending_order:
@@ -105,6 +107,9 @@ def orderconfirm(request):
                     "cart_items": cart_items_current,  # 使用最新的購物車數據
                     "total_quantity": current_total_quantity,
                     "total_amount": current_total_amount,
+                    "final_amount": pending_order.get_final_amount(),
+                    "discount_amount": pending_order.discount_amount,
+                    "coupon": pending_order.coupon,
                     "shopcart": shopcart,
                 },
             )
@@ -132,8 +137,8 @@ def orderconfirm(request):
             receipient=receipient,
             receipient_phone=receipient_phone,
             shipping_address=shipping_address,
-            payment_status="PENDI",
-            shipping_status="STOCK",
+            payment_status="待付款",
+            shipping_status="備貨中",
             total_amount=total_amount,
         )
 
@@ -155,6 +160,9 @@ def orderconfirm(request):
                 "cart_items": cart_items,
                 "total_quantity": total_quantity,
                 "total_amount": total_amount,
+                "final_amount": order.get_final_amount(),
+                "discount_amount": order.discount_amount,
+                "coupon": order.coupon,
                 "shopcart": shopcart,
             },
         )
@@ -172,31 +180,31 @@ def create_order(request):
     cart_items = shopcart.cartitem_set.filter(is_ordered=False)
 
     # 防止重覆：檢查這個購物車是否已建立訂單且未取消
-    existing_order = Order.objects.filter(shopcart=shopcart, status__in=['pending', 'paid']).first()
+    existing_order = Order.objects.filter(shopCartId=shopcart, payment_status="待付款").first()
     if existing_order:
         messages.warning(request, "此購物車已建立訂單，請勿重覆下單。")
         return redirect('orders:orderconfirm', order_id=existing_order.id)
 
     # 建立訂單
     order = Order.objects.create(
-        user=request.user,
-        shopcart=shopcart,
+        userId=request.user,
+        shopCartId=shopcart,
         total_amount=sum(item.sub_total for item in cart_items),
-        status='pending'
+        payment_status='待付款'
     )
     # 建立訂單明細
     for item in cart_items:
         OrderItem.objects.create(
-            order=order,
-            book=item.bookId,
+            orderid=order,
+            bookid=item.bookId,
+            CartID=item,
             quantity=item.quantity,
             unit_price=item.unit_price,
-            sub_total=item.sub_total
+            subTotal=item.sub_total
         )
-    # 建立訂單成功後，標記購物車商品為已下單
-    shopcart.cartitem_set.filter(is_ordered=False).update(is_ordered=True)
-    # 或者：shopcart.delete()  # 如果你想連購物車本身都刪除
-    messages.success(request, "訂單已建立，購物車已清空。")
+    # 注意：不要在這裡標記購物車商品為已下單！
+    # 只有在付款成功後才應該清空購物車
+    messages.success(request, "訂單已建立，請前往付款。")
     return redirect('orders:orderconfirm', order_id=order.id)
 
 
@@ -209,6 +217,10 @@ def order_detail(request, order_id):
     return render(request, 'orders/order_detail.html', {
         'order': order,
         'order_items': order_items,
+        'final_amount': order.get_final_amount(),
+        'discount_amount': order.discount_amount,
+        'coupon': order.coupon,
+        'can_use_coupon': order.payment_status == "待付款",  # 只有待付款狀態可以使用優惠碼
     })
 
 
@@ -246,11 +258,11 @@ def cancel_order(request):
         # 獲取購物車
         shopcart = get_object_or_404(ShopCart, id=shopcart_id, userId=request.user)
         
-        # 檢查是否有處於 PENDI 狀態的相關訂單
+        # 檢查是否有處於 待付款 狀態的相關訂單
         pending_order = Order.objects.filter(
             shopCartId=shopcart, 
             userId=request.user,
-            payment_status="PENDI"
+            payment_status="待付款"
         ).first()
         
         if pending_order:
@@ -320,3 +332,77 @@ def cancel_order_by_id(request, order_id):
     except Exception as e:
         messages.error(request, f"取消訂單時發生錯誤: {str(e)}")
         return redirect("orders:order_list")
+
+
+@login_required
+@require_POST
+def apply_coupon(request, order_id):
+    """應用優惠碼到訂單"""
+    print(f"[DEBUG] 用戶 {request.user.username} 嘗試為訂單 {order_id} 應用優惠碼")
+    
+    order = get_object_or_404(Order, id=order_id, userId=request.user)
+    print(f"[DEBUG] 找到訂單 {order.id}，狀態: {order.payment_status}")
+    
+    # 只允許在待付款狀態下應用優惠碼
+    if order.payment_status != "待付款":
+        print(f"[DEBUG] 訂單狀態不允許使用優惠碼: {order.payment_status}")
+        return JsonResponse({
+            'success': False, 
+            'message': '只能在待付款狀態下使用優惠碼'
+        })
+    
+    coupon_code = request.POST.get('coupon_code', '').strip().upper()
+    print(f"[DEBUG] 收到的優惠碼: '{coupon_code}'")
+    
+    if not coupon_code:
+        print("[DEBUG] 優惠碼為空")
+        return JsonResponse({
+            'success': False, 
+            'message': '請輸入優惠碼'
+        })
+    
+    try:
+        success, message = order.apply_coupon(coupon_code)
+        print(f"[DEBUG] 應用優惠碼結果: success={success}, message={message}")
+        
+        if success:
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'discount_amount': float(order.discount_amount),
+                'final_amount': float(order.get_final_amount()),
+                'coupon_code': coupon_code
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': message
+            })
+    except Exception as e:
+        print(f"[DEBUG] 應用優惠碼時發生異常: {e}")
+        return JsonResponse({
+            'success': False,
+            'message': f'系統錯誤: {str(e)}'
+        })
+
+
+@login_required
+@require_POST
+def remove_coupon(request, order_id):
+    """移除訂單的優惠碼"""
+    order = get_object_or_404(Order, id=order_id, userId=request.user)
+    
+    # 只允許在待付款狀態下移除優惠碼
+    if order.payment_status != "待付款":
+        return JsonResponse({
+            'success': False, 
+            'message': '只能在待付款狀態下移除優惠碼'
+        })
+    
+    order.remove_coupon()
+    
+    return JsonResponse({
+        'success': True,
+        'message': '優惠碼已移除',
+        'final_amount': float(order.get_final_amount())
+    })

@@ -12,17 +12,21 @@ class PaymentPageView(View):
     def get(self, request, order_id, *args, **kwargs):
         order = get_object_or_404(Order, id=order_id, userId=request.user)
         order_items = OrderItem.objects.filter(orderid=order)
-        order_total = order.total_amount
+        order_total = order.get_final_amount()  # 使用最終金額（包含折扣）
         return render(request, 'payments/payment.html', {
             'order': order,
             'order_items': order_items,
             'order_total': order_total,
+            'final_amount': order_total,
+            'discount_amount': order.discount_amount,
+            'coupon': order.coupon,
             'STRIPE_PUBLIC_KEY': settings.STRIPE_PUBLIC_KEY,
         })
 
 class CreateCheckoutSessionView(View):
     def post(self, request, order_id, *args, **kwargs):
         order = get_object_or_404(Order, id=order_id, userId=request.user)
+        final_amount = order.get_final_amount()  # 使用最終金額
         try:
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
@@ -33,7 +37,7 @@ class CreateCheckoutSessionView(View):
                             'product_data': {
                                 'name': f'訂單 #{order.id}',
                             },
-                            'unit_amount': int(order.total_amount * 100),  # Stripe 以分為單位
+                            'unit_amount': int(final_amount * 100),  # 使用最終金額，Stripe 以分為單位
                         },
                         'quantity': 1,
                     }
@@ -96,9 +100,14 @@ def stripe_webhook(request):
                 order = Order.objects.get(id=order_id)
                 print(f"[DEBUG] Stripe付款開始處理訂單 {order.id}")
                 
-                order.payment_status = "PAID"
+                order.payment_status = "已付款"
                 order.save()
-                print(f"[DEBUG] 訂單 {order.id} 狀態已更新為 PAID")
+                print(f"[DEBUG] 訂單 {order.id} 狀態已更新為已付款")
+                
+                # 如果使用了優惠碼，標記為已使用
+                if order.coupon:
+                    order.coupon.use_coupon()
+                    print(f"[DEBUG] 優惠碼 {order.coupon.code} 已標記為使用")
                 
                 # 付款成功後標記購物車商品為已下單並扣減庫存
                 if order.shopCartId:
@@ -111,11 +120,6 @@ def stripe_webhook(request):
                         book = cart_item.bookId
                         print(f"[DEBUG] 處理 CartItem {cart_item.id}: {book.title}")
                         
-                        # 標記購物車商品為已下單
-                        cart_item.is_ordered = True
-                        cart_item.save()
-                        print(f"[DEBUG] CartItem {cart_item.id} 已標記為 is_ordered=True")
-                        
                         # 扣減庫存
                         if book.stock >= cart_item.quantity:
                             book.stock -= cart_item.quantity
@@ -124,16 +128,15 @@ def stripe_webhook(request):
                         else:
                             print(f"[WARNING] {book.title} 庫存不足，無法扣減")
                     
-                    # 為用戶創建新的購物車（重置購物車狀態）
-                    from carts.models import ShopCart
-                    print(f"[DEBUG] 為用戶 {order.userId} 創建新購物車")
-                    ShopCart.objects.create(userId=order.userId)
-                    print(f"[DEBUG] 新購物車已創建")
+                    # 使用訂單模型的方法清空購物車
+                    print(f"[DEBUG] 清空用戶 {order.userId} 的購物車")
+                    order.clear_cart_after_payment()
+                    print(f"[DEBUG] 購物車已清空已下單商品")
                 
                 # 發送付款成功郵件
                 send_payment_success_email(order, 'Stripe')
                 
-                print(f"[DEBUG] 訂單 {order.id} 狀態已更新為 PAID，購物車已清空")
+                print(f"[DEBUG] 訂單 {order.id} 狀態已更新為已付款，購物車已清空")
             else:
                 print("[DEBUG] 無法從 session metadata 獲取訂單 ID")
                 
@@ -160,9 +163,14 @@ def fps_payment(request, order_id):
         order = get_object_or_404(Order, id=order_id, userId=request.user)
         print(f"[DEBUG] FPS付款開始處理訂單 {order.id}")
         
-        order.payment_status = "PAID"
+        order.payment_status = "已付款"
         order.save()
-        print(f"[DEBUG] 訂單 {order.id} 狀態已更新為 PAID")
+        print(f"[DEBUG] 訂單 {order.id} 狀態已更新為已付款")
+        
+        # 如果使用了優惠碼，標記為已使用
+        if order.coupon:
+            order.coupon.use_coupon()
+            print(f"[DEBUG] 優惠碼 {order.coupon.code} 已標記為使用")
         
         # 付款成功後標記購物車商品為已下單並扣減庫存
         if order.shopCartId:
@@ -175,11 +183,6 @@ def fps_payment(request, order_id):
                 book = cart_item.bookId
                 print(f"[DEBUG] 處理 CartItem {cart_item.id}: {book.title}")
                 
-                # 標記購物車商品為已下單
-                cart_item.is_ordered = True
-                cart_item.save()
-                print(f"[DEBUG] CartItem {cart_item.id} 已標記為 is_ordered=True")
-                
                 # 扣減庫存
                 if book.stock >= cart_item.quantity:
                     book.stock -= cart_item.quantity
@@ -188,11 +191,10 @@ def fps_payment(request, order_id):
                 else:
                     print(f"[WARNING] {book.title} 庫存不足，無法扣減")
             
-            # 為用戶創建新的購物車（重置購物車狀態）
-            from carts.models import ShopCart
-            print(f"[DEBUG] 為用戶 {order.userId} 創建新購物車")
-            ShopCart.objects.create(userId=order.userId)
-            print(f"[DEBUG] 新購物車已創建")
+            # 使用訂單模型的方法清空購物車
+            print(f"[DEBUG] 清空用戶 {order.userId} 的購物車")
+            order.clear_cart_after_payment()
+            print(f"[DEBUG] 購物車已清空已下單商品")
         
         # 發送付款成功郵件
         send_payment_success_email(order, 'FPS')
@@ -216,12 +218,17 @@ def payment_success(request):
             print(f"[DEBUG] 付款成功頁面 - 處理訂單 {order.id}")
             
             # 確保訂單狀態已更新為已付款（因為 webhook 可能有延遲）
-            if order.payment_status != "PAID":
-                print(f"[DEBUG] 訂單 {order.id} 狀態仍為 {order.payment_status}，手動更新為 PAID")
+            if order.payment_status != "已付款":
+                print(f"[DEBUG] 訂單 {order.id} 狀態仍為 {order.payment_status}，手動更新為已付款")
                 
                 # 手動更新訂單狀態和購物車
-                order.payment_status = "PAID"
+                order.payment_status = "已付款"
                 order.save()
+                
+                # 如果使用了優惠碼，標記為已使用
+                if order.coupon:
+                    order.coupon.use_coupon()
+                    print(f"[DEBUG] 優惠碼 {order.coupon.code} 已標記為使用")
                 
                 # 手動標記購物車商品為已下單並扣減庫存
                 if order.shopCartId:
@@ -233,11 +240,6 @@ def payment_success(request):
                         book = cart_item.bookId
                         print(f"[DEBUG] 手動處理 CartItem {cart_item.id}: {book.title}")
                         
-                        # 標記購物車商品為已下單
-                        cart_item.is_ordered = True
-                        cart_item.save()
-                        print(f"[DEBUG] CartItem {cart_item.id} 已手動標記為 is_ordered=True")
-                        
                         # 扣減庫存
                         if book.stock >= cart_item.quantity:
                             book.stock -= cart_item.quantity
@@ -246,11 +248,10 @@ def payment_success(request):
                         else:
                             print(f"[WARNING] {book.title} 庫存不足，無法扣減")
                 
-                # 為用戶創建新的購物車（重置購物車狀態）
-                from carts.models import ShopCart
-                print(f"[DEBUG] 為用戶 {order.userId} 創建新購物車")
-                ShopCart.objects.create(userId=order.userId)
-                print(f"[DEBUG] 新購物車已創建")
+                # 使用訂單模型的方法清空購物車
+                print(f"[DEBUG] 清空用戶 {order.userId} 的購物車")
+                order.clear_cart_after_payment()
+                print(f"[DEBUG] 購物車已清空已下單商品")
             
             return render(request, 'payments/success.html', {
                 'order': order,

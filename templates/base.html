@@ -34,7 +34,9 @@
       {% for message in messages %}
         <div class="notification-toast {{ message.tags }}" role="alert">
           {{ message }}
-          <button type="button" class="btn-close" onclick="closeNotification(this.parentElement)">×</button>
+          <button type="button" class="close" onclick="closeNotification(this.parentElement)">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
       {% endfor %}
     </div>
@@ -85,7 +87,8 @@
       const notification = document.createElement('div');
       notification.className = 'notification-toast error';
       notification.innerHTML = '您尚未登入，請先登入以使用購物車功能。' +
-        '<button type="button" class="btn-close" onclick="closeNotification(this.parentElement)"></button>';
+        '<button type="button" class="close" onclick="closeNotification(this.parentElement)">' +
+        '<span aria-hidden="true">&times;</span></button>';
       
       notificationContainer.appendChild(notification);
       
@@ -111,7 +114,9 @@
     notification.className = 'notification-toast ' + (isError ? 'error' : '');
     notification.innerHTML = `
       ${message}
-      <button type="button" class="btn-close" onclick="closeNotification(this.parentElement)">×</button>
+      <button type="button" class="close" onclick="closeNotification(this.parentElement)">
+        <span aria-hidden="true">&times;</span>
+      </button>
     `;
     
     // 添加到容器
